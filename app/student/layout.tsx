@@ -3,7 +3,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import Sidebar from "@/components/dashboard/Sidebar";
 import Particles from "@/components/landing/Particles";
 import { Bell } from "lucide-react";
 import { motion } from "framer-motion";
@@ -12,7 +11,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { School } from "@/lib/types";
 
-export default function AdminLayout({
+export default function StudentLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -22,7 +21,7 @@ export default function AdminLayout({
   const [school, setSchool] = useState<School | null>(null);
 
   useEffect(() => {
-    if (!loading && (!user || user.role !== "admin")) {
+    if (!loading && (!user || user.role !== "student")) {
       router.push("/login");
     }
   }, [user, loading, router]);
@@ -70,7 +69,7 @@ export default function AdminLayout({
     );
   }
 
-  if (!user || user.role !== "admin") {
+  if (!user || user.role !== "student") {
     return null;
   }
 
@@ -111,21 +110,11 @@ export default function AdminLayout({
 
       {/* Content */}
       <div className="flex flex-1 overflow-hidden p-3 gap-3 z-10">
-        {/* Sidebar */}
-        <motion.div
-          initial={{ x: -20, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
-          className="shrink-0"
-        >
-          <Sidebar />
-        </motion.div>
-
         {/* Main Content Area */}
         <motion.div
-          initial={{ x: 20, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ duration: 0.3, delay: 0.2 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
           className="flex-1 overflow-y-auto"
         >
           {children}

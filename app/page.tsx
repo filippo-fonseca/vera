@@ -1,22 +1,31 @@
-'use client';
+"use client";
 
-import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
-import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
-import CustomButton from '@/components/common/CustomButton/CustomButton';
-import { GraduationCap, Users, BookOpen, BarChart, Sparkles, Target } from 'lucide-react';
-import Particles from '@/components/landing/Particles';
-import TypingAnimation from '@/components/landing/TypingAnimation';
-import WordRotate from '@/components/landing/WordRotate';
-import { BentoCard, BentoGrid } from '@/components/landing/BentoGrid';
-import Marquee from '@/components/landing/Marquee';
-import { cn } from '@/lib/utils';
+import { useAuth } from "@/contexts/AuthContext";
+import { useRouter } from "next/navigation";
+import React, { useEffect, useState } from "react";
+import Link from "next/link";
+import CustomButton from "@/components/common/CustomButton/CustomButton";
+import {
+  GraduationCap,
+  Users,
+  BookOpen,
+  BarChart,
+  Sparkles,
+  Target,
+} from "lucide-react";
+import Particles from "@/components/landing/Particles";
+import TypingAnimation from "@/components/landing/TypingAnimation";
+import WordRotate from "@/components/landing/WordRotate";
+import { BentoCard, BentoGrid } from "@/components/landing/BentoGrid";
+import Marquee from "@/components/landing/Marquee";
+import { cn } from "@/lib/utils";
+import LogoAppIcon from "@/components/icons/LogoAppIcon";
 
 const features = [
   {
     name: "Student Management",
-    description: "Track progress, manage records, and maintain seamless communication with students and guardians.",
+    description:
+      "Track progress, manage records, and maintain seamless communication with students and guardians.",
     Icon: GraduationCap,
     href: "#",
     cta: "Learn more",
@@ -27,7 +36,8 @@ const features = [
   },
   {
     name: "Powerful Analytics",
-    description: "Gain insights with comprehensive analytics and customizable reporting tools.",
+    description:
+      "Gain insights with comprehensive analytics and customizable reporting tools.",
     Icon: BarChart,
     href: "#",
     cta: "Learn more",
@@ -52,8 +62,12 @@ const features = [
             )}
           >
             <div className="flex flex-col">
-              <figcaption className="text-sm font-medium">{stat.title}</figcaption>
-              <p className="text-2xl font-bold text-pink-500 mt-2">{stat.value}</p>
+              <figcaption className="text-sm font-medium">
+                {stat.title}
+              </figcaption>
+              <p className="text-2xl font-bold text-pink-500 mt-2">
+                {stat.value}
+              </p>
             </div>
           </figure>
         ))}
@@ -62,7 +76,8 @@ const features = [
   },
   {
     name: "Staff Collaboration",
-    description: "Enable seamless collaboration between teachers, administrators, and staff members.",
+    description:
+      "Enable seamless collaboration between teachers, administrators, and staff members.",
     Icon: Users,
     href: "#",
     cta: "Learn more",
@@ -73,7 +88,8 @@ const features = [
   },
   {
     name: "Course Management",
-    description: "Organize courses, assignments, and learning materials effortlessly.",
+    description:
+      "Organize courses, assignments, and learning materials effortlessly.",
     Icon: BookOpen,
     href: "#",
     cta: "Learn more",
@@ -97,7 +113,14 @@ export default function Home() {
 
   useEffect(() => {
     if (!loading && user) {
-      router.push('/admin');
+      // Route based on user role
+      if (user.role === "admin") {
+        router.push("/admin");
+      } else if (user.role === "teacher") {
+        router.push("/teacher");
+      } else if (user.role === "student") {
+        router.push("/student");
+      }
     }
   }, [user, loading, router]);
 
@@ -128,8 +151,11 @@ export default function Home() {
           showRotate && "w-full"
         }`}
       >
-        <div className="flex flex-col items-center justify-center gap-2">
-          <h1 className="font-bold text-5xl text-black">Vera</h1>
+        <div className="flex items-center justify-center gap-2">
+          <div className="size-9 rounded-xl bg-pink-500 flex items-center justify-center shadow-lg border border-gray-200">
+            <LogoAppIcon className="size-7" />
+          </div>
+          <h1 className="font-bold text-4xl text-black">Vera</h1>
         </div>
 
         <div className="flex flex-col items-center justify-center text-center gap-6">
@@ -141,14 +167,13 @@ export default function Home() {
             />
             <div
               className={`transition-all duration-500 ${
-                showRotate
-                  ? "max-h-32 opacity-100"
-                  : "max-h-0 opacity-0"
+                showRotate ? "max-h-32 opacity-100" : "max-h-0 opacity-0"
               } overflow-hidden`}
             >
               <WordRotate
                 words={[
                   "simple.",
+                  "for humans.",
                   "elegant.",
                   "easy to use.",
                   "secure.",

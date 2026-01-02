@@ -6,6 +6,7 @@ import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, collection } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { useTheme } from '@/contexts/ThemeContext';
+import LogoAppIcon from '@/components/icons/LogoAppIcon';
 
 export default function SetupPage() {
   const router = useRouter();
@@ -129,13 +130,18 @@ export default function SetupPage() {
       </button>
 
       <div className="w-full max-w-2xl">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-50 mb-2">
-            Welcome to Vera
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Let's get your school set up in just a few steps
-          </p>
+        <div className="flex flex-col items-center text-center mb-8 gap-4">
+          <div className="size-16 rounded-xl bg-pink-500 flex items-center justify-center shadow-lg border border-gray-200">
+            <LogoAppIcon className="size-10" />
+          </div>
+          <div>
+            <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-50 mb-2">
+              Welcome to Vera
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              Let's get your school set up in just a few steps
+            </p>
+          </div>
         </div>
 
         {/* Progress indicator */}

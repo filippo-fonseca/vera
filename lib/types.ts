@@ -37,3 +37,23 @@ export interface Student extends User {
   guardianEmail?: string;
   guardianPhone?: string;
 }
+
+export interface PendingInvite {
+  id: string;
+  email: string;
+  role: UserRole;
+  schoolId: string;
+  firstName: string;
+  lastName: string;
+  // Employee-specific fields
+  department?: string;
+  title?: string;
+  // Student-specific fields
+  gradeLevel?: string;
+  studentId?: string;
+  guardianEmail?: string;
+  guardianPhone?: string;
+  invitedBy: string; // admin user ID
+  createdAt: Date;
+  status: 'pending' | 'accepted';
+}
