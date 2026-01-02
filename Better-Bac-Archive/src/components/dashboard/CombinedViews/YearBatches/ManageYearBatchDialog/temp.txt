@@ -1,0 +1,136 @@
+<CustomDiv className="flex flex-col justify-between">
+                                <CustomDiv className="space-y-6">
+                                    <CustomDiv className="space-y-4">
+                                        <CustomDiv className="space-y-1">
+                                            <CustomText className="text-xl font-semibold">
+                                                {
+                                                    yearBatchesStore
+                                                        .currentYearBatch?.name
+                                                }
+                                            </CustomText>
+                                            <CustomText className="text-sm text-gray-600">
+                                                <CustomDiv className="flex items-center justify-center border shadow-md px-1.5 h-6 rounded-lg w-max text-white bg-black border-black">
+                                                    <CustomText className="text-xs font-semibold">
+                                                        {yearBatchesStore
+                                                            .currentYearBatch
+                                                            ?.isNov
+                                                            ? "Nov "
+                                                            : "May "}
+                                                        {
+                                                            yearBatchesStore
+                                                                .currentYearBatch
+                                                                ?.examSessionYear
+                                                        }
+                                                    </CustomText>
+                                                </CustomDiv>
+                                            </CustomText>
+                                        </CustomDiv>
+                                        <CustomTextInput
+                                            placeholder={`Search students in this year batch`}
+                                            value={yearBatchStudentsQuery}
+                                            onChange={e =>
+                                                setYearBatchStudentsQuery(
+                                                    e.target.value
+                                                )
+                                            }
+                                        />
+                                    </CustomDiv>
+                                    <hr />
+                                    <CustomDiv className="space-y-8">
+                                        <CustomDiv className="flex items-center justify-between">
+                                            <div className="leading-[0.2rem]">
+                                                <CustomText className="text-lg font-semibold">
+                                                    Student List
+                                                </CustomText>
+                                                <CustomText className="text-sm text-gray-600">
+                                                    Currently:{" "}
+                                                    <strong>
+                                                        {
+                                                            yearBatchesStore
+                                                                .currentYearBatch
+                                                                ?.studentIds
+                                                                .length
+                                                        }
+                                                    </strong>{" "}
+                                                    {yearBatchesStore
+                                                        .currentYearBatch
+                                                        ?.studentIds.length ===
+                                                    1
+                                                        ? "student"
+                                                        : "students"}{" "}
+                                                    in this year batch
+                                                </CustomText>
+                                            </div>
+                                            <CustomRoundedButton
+                                                onClick={() =>
+                                                    setIsAddPeopleViewEnabled(
+                                                        true
+                                                    )
+                                                }
+                                            />
+                                        </CustomDiv>
+                                        <div className="h-[35vh] overflow-y-auto px-8">
+                                            {yearBatchStudents.length == 0 ? (
+                                                <CustomDiv className="flex flex-col items-center justify-center gap-2 mt-4">
+                                                    <SquirrelEmpty
+                                                        header="Oop! No students found."
+                                                        subHeader={
+                                                            yearBatchStudentsQuery !==
+                                                            ""
+                                                                ? "Try adjusting your query for better results."
+                                                                : "Add students to this year batch by clicking the button above."
+                                                        }
+                                                    />
+                                                </CustomDiv>
+                                            ) : (
+                                                <CustomDiv className="list-disc space-y-4">
+                                                    {yearBatchStudents.map(
+                                                        student => (
+                                                            <MemberDisplay
+                                                                key={student.id}
+                                                                {...student}
+                                                                customRightComponent={
+                                                                    <CustomButton
+                                                                        className="flex items-center justify-center text-xs stroke-black hover:stroke-white font-semibold bg-white hover:bg-black hover:text-white active:scale-110 focus:outline-none border border-black focus:ring-4 focus:ring-gray-300 rounded-lg px-2 py-2 mb-2 transition-transform duration-150"
+                                                                        onClick={() =>
+                                                                            deleteStudent(
+                                                                                student.id
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        <Trash
+                                                                            size={
+                                                                                14
+                                                                            }
+                                                                        />
+                                                                    </CustomButton>
+                                                                }
+                                                            />
+                                                        )
+                                                    )}
+                                                </CustomDiv>
+                                            )}
+                                        </div>
+                                    </CustomDiv>
+                                </CustomDiv>
+                                <CustomDiv className="flex items-center justify-between">
+                                    <CustomButton
+                                    // onClick={props.handleClear}
+                                    // addedClassname={`text-xs ${
+                                    //     props.selectedStudents.length ===
+                                    //         0 && "opacity-0"
+                                    // }`}
+                                    >
+                                        Clear
+                                    </CustomButton>
+                                    <CustomButton
+                                    // onClick={props.handleSave}
+                                    // addedClassname={`text-xs ${
+                                    //     props.selectedStudents.length ===
+                                    //         0 && "opacity-0"
+                                    // }`}
+                                    >
+                                        Save
+                                    </CustomButton>
+                                </CustomDiv>
+                            </CustomDiv>
