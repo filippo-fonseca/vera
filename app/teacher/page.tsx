@@ -12,6 +12,17 @@ import {
   FileText,
   X,
   Sparkles,
+  Calculator,
+  Beaker,
+  Atom,
+  Palette,
+  Music,
+  Globe,
+  Code,
+  Cpu,
+  Dumbbell,
+  Heart,
+  Star,
 } from "lucide-react";
 import {
   collection,
@@ -23,7 +34,7 @@ import {
 import { db } from "@/lib/firebase";
 import { Class } from "@/lib/types";
 import { TextField, Select, TextArea } from "@/components/common/Form";
-import Particles from "@/components/landing/Particles";
+import { getClassBanner, getClassIconName } from "@/lib/classCustomization";
 
 const CLASS_COLORS = [
   { name: "Pink", value: "#ec4899" },
@@ -141,16 +152,8 @@ export default function TeacherDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 relative overflow-hidden">
-      <Particles
-        className="absolute inset-0 opacity-30"
-        quantity={100}
-        ease={80}
-        color={"#ec489920"}
-        refresh
-      />
-
-      <div className="relative z-10 p-6 max-w-7xl mx-auto">
+    <div className="min-h-screen">
+      <div className="p-6 max-w-7xl mx-auto">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -171,9 +174,9 @@ export default function TeacherDashboard() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setShowCreateModal(true)}
-              className="px-6 py-3.5 bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-pink-500/30 hover:shadow-xl hover:shadow-pink-500/40 transition-all flex items-center gap-2.5"
+              className="px-3.5 py-2 bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white text-xs font-bold rounded-lg shadow-sm transition-all flex items-center gap-1.5"
             >
-              <Plus className="size-5" />
+              <Plus className="size-3.5" />
               Create Class
             </motion.button>
           </div>
@@ -267,60 +270,81 @@ export default function TeacherDashboard() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setShowCreateModal(true)}
-              className="px-6 py-3.5 bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-pink-500/30 hover:shadow-xl hover:shadow-pink-500/40 transition-all inline-flex items-center gap-2.5"
+              className="px-3.5 py-2 bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white text-xs font-bold rounded-lg shadow-sm transition-all inline-flex items-center gap-1.5"
             >
-              <Plus className="size-5" />
+              <Plus className="size-3.5" />
               Create Your First Class
             </motion.button>
           </motion.div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {classes.map((cls, index) => (
-              <motion.div
-                key={cls.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.4 + index * 0.1 }}
-                whileHover={{ y: -8, scale: 1.02 }}
-                onClick={() => router.push(`/teacher/classes/${cls.id}`)}
-                className="group bg-white border-2 border-gray-100 rounded-2xl shadow-md hover:shadow-2xl transition-all cursor-pointer overflow-hidden"
-              >
-                <div
-                  className="h-32 p-6 text-white relative overflow-hidden"
-                  style={{ backgroundColor: cls.color }}
+            {classes.map((cls, index) => {
+              const IconComponent = {
+                BookOpen,
+                Calculator,
+                Beaker,
+                Atom,
+                Palette,
+                Music,
+                Globe,
+                Code,
+                Cpu,
+                Dumbbell,
+                Heart,
+                Star,
+              }[getClassIconName(cls.icon)];
+
+              return (
+                <motion.div
+                  key={cls.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.4 + index * 0.1 }}
+                  whileHover={{ y: -8, scale: 1.02 }}
+                  onClick={() => router.push(`/teacher/classes/${cls.id}`)}
+                  className="group bg-white border-2 border-gray-100 rounded-2xl shadow-md hover:shadow-2xl transition-all cursor-pointer overflow-hidden"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-br from-black/0 via-black/0 to-black/20" />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
-                  <div className="relative z-10 h-full flex flex-col justify-between">
-                    <div>
-                      <h3 className="text-2xl font-black mb-1 line-clamp-1">
-                        {cls.name}
-                      </h3>
-                      <p className="text-white/90 font-semibold text-sm">
-                        {cls.subject}
+                  <div
+                    className={`h-32 p-6 text-white relative overflow-hidden bg-gradient-to-r ${getClassBanner(cls.banner).gradient}`}
+                  >
+                    <div className="absolute inset-0 bg-black/10" />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
+                    <div className="relative z-10 h-full flex items-center justify-between">
+                      <div className="flex-1">
+                        <h3 className="text-2xl font-black mb-1 line-clamp-1">
+                          {cls.name}
+                        </h3>
+                        <p className="text-white/90 font-semibold text-sm">
+                          {cls.subject}
+                        </p>
+                      </div>
+                      {IconComponent && (
+                        <div className="size-14 rounded-xl bg-white/20 backdrop-blur-md border-2 border-white/30 shadow-lg flex items-center justify-center flex-shrink-0">
+                          <IconComponent className="size-7 text-white" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    {cls.section && (
+                      <p className="text-sm font-semibold text-gray-600 mb-3">
+                        Section {cls.section}
+                        {cls.room && ` • Room ${cls.room}`}
                       </p>
+                    )}
+                    <div className="flex items-center gap-2 text-gray-700">
+                      <div className="size-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                        <Users className="size-4 text-blue-600" />
+                      </div>
+                      <span className="text-sm font-bold">
+                        {cls.studentIds.length}{" "}
+                        {cls.studentIds.length === 1 ? "student" : "students"}
+                      </span>
                     </div>
                   </div>
-                </div>
-                <div className="p-6">
-                  {cls.section && (
-                    <p className="text-sm font-semibold text-gray-600 mb-3">
-                      Section {cls.section}
-                      {cls.room && ` • Room ${cls.room}`}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-2 text-gray-700">
-                    <div className="size-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                      <Users className="size-4 text-blue-600" />
-                    </div>
-                    <span className="text-sm font-bold">
-                      {cls.studentIds.length}{" "}
-                      {cls.studentIds.length === 1 ? "student" : "students"}
-                    </span>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              );
+            })}
           </div>
         )}
       </div>

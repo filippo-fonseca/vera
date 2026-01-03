@@ -69,6 +69,8 @@ export interface Class {
   section?: string;
   room?: string;
   color?: string;
+  icon?: string;
+  banner?: string;
   studentIds: string[];
   createdAt: Date;
   updatedAt: Date;
@@ -84,6 +86,19 @@ export interface Assignment {
   type: 'assignment' | 'quiz' | 'exam' | 'project';
   attachments?: string[];
   createdBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Post {
+  id: string;
+  classId: string;
+  content: string;
+  authorId: string;
+  authorName: string;
+  type: 'announcement' | 'material' | 'assignment';
+  attachments?: string[];
+  assignmentId?: string; // Reference to assignment if type is 'assignment'
   createdAt: Date;
   updatedAt: Date;
 }
