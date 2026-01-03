@@ -57,3 +57,33 @@ export interface PendingInvite {
   createdAt: Date;
   status: 'pending' | 'accepted';
 }
+
+export interface Class {
+  id: string;
+  name: string;
+  subject: string;
+  description?: string;
+  schoolId: string;
+  teacherId: string;
+  teacherName: string;
+  section?: string;
+  room?: string;
+  color?: string;
+  studentIds: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Assignment {
+  id: string;
+  classId: string;
+  title: string;
+  description?: string;
+  dueDate?: Date;
+  points?: number;
+  type: 'assignment' | 'quiz' | 'exam' | 'project';
+  attachments?: string[];
+  createdBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
