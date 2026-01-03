@@ -11,6 +11,7 @@ import {
   Calendar,
   FileText,
   X,
+  Sparkles,
 } from "lucide-react";
 import {
   collection,
@@ -18,11 +19,11 @@ import {
   where,
   getDocs,
   addDoc,
-  doc,
-  getDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Class, User } from "@/lib/types";
+import { Class } from "@/lib/types";
+import { TextField, Select, TextArea } from "@/components/common/Form";
+import Particles from "@/components/landing/Particles";
 
 const CLASS_COLORS = [
   { name: "Pink", value: "#ec4899" },
@@ -38,6 +39,7 @@ export default function TeacherDashboard() {
   const router = useRouter();
   const [classes, setClasses] = useState<Class[]>([]);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [totalStudents, setTotalStudents] = useState(0);
   const [formData, setFormData] = useState({
@@ -91,6 +93,8 @@ export default function TeacherDashboard() {
     e.preventDefault();
     if (!user) return;
 
+    setCreating(true);
+
     try {
       await addDoc(collection(db, "classes"), {
         name: formData.name,
@@ -116,175 +120,210 @@ export default function TeacherDashboard() {
         color: CLASS_COLORS[0].value,
       });
       setShowCreateModal(false);
-      fetchClasses();
+      await fetchClasses();
     } catch (error) {
       console.error("Error creating class:", error);
+    } finally {
+      setCreating(false);
     }
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500"></div>
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          className="rounded-full h-12 w-12 border-4 border-gray-200 border-t-pink-500"
+        />
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">My Classes</h1>
-          <p className="text-gray-600">
-            Manage your classes, assignments, and students
-          </p>
-        </div>
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={() => setShowCreateModal(true)}
-          className="px-5 py-3 bg-pink-500 hover:bg-pink-600 text-white text-sm font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
-        >
-          <Plus className="size-5" />
-          Create Class
-        </motion.button>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 relative overflow-hidden">
+      <Particles
+        className="absolute inset-0 opacity-30"
+        quantity={100}
+        ease={80}
+        color={"#ec489920"}
+        refresh
+      />
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="relative z-10 p-6 max-w-7xl mx-auto">
+        {/* Header */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="bg-white/80 backdrop-blur-sm border border-gray-200/50 rounded-2xl p-6 shadow-lg"
+          className="mb-8"
         >
-          <div className="flex items-center gap-4">
-            <div className="size-12 rounded-xl bg-pink-100 flex items-center justify-center">
-              <BookOpen className="size-6 text-pink-500" />
-            </div>
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">My Classes</p>
-              <p className="text-2xl font-bold text-gray-900">{classes.length}</p>
+              <h1 className="text-4xl font-black text-gray-900 mb-2 tracking-tight">
+                My Classes
+              </h1>
+              <p className="text-gray-600 font-medium">
+                Manage your classes, assignments, and students
+              </p>
             </div>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowCreateModal(true)}
+              className="px-6 py-3.5 bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-pink-500/30 hover:shadow-xl hover:shadow-pink-500/40 transition-all flex items-center gap-2.5"
+            >
+              <Plus className="size-5" />
+              Create Class
+            </motion.button>
           </div>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="bg-white/80 backdrop-blur-sm border border-gray-200/50 rounded-2xl p-6 shadow-lg"
-        >
-          <div className="flex items-center gap-4">
-            <div className="size-12 rounded-xl bg-blue-100 flex items-center justify-center">
-              <Users className="size-6 text-blue-500" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Total Students</p>
-              <p className="text-2xl font-bold text-gray-900">{totalStudents}</p>
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="bg-white/80 backdrop-blur-sm border border-gray-200/50 rounded-2xl p-6 shadow-lg"
-        >
-          <div className="flex items-center gap-4">
-            <div className="size-12 rounded-xl bg-purple-100 flex items-center justify-center">
-              <Calendar className="size-6 text-purple-500" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">This Week</p>
-              <p className="text-2xl font-bold text-gray-900">0</p>
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-          className="bg-white/80 backdrop-blur-sm border border-gray-200/50 rounded-2xl p-6 shadow-lg"
-        >
-          <div className="flex items-center gap-4">
-            <div className="size-12 rounded-xl bg-green-100 flex items-center justify-center">
-              <FileText className="size-6 text-green-500" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Assignments</p>
-              <p className="text-2xl font-bold text-gray-900">0</p>
-            </div>
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Classes Grid */}
-      {classes.length === 0 ? (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white/80 backdrop-blur-sm border border-gray-200/50 rounded-2xl p-12 text-center"
-        >
-          <BookOpen className="size-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-gray-900 mb-2">
-            No classes yet
-          </h3>
-          <p className="text-gray-600 mb-6">
-            Create your first class to get started with managing students and
-            assignments
-          </p>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-5 py-3 bg-pink-500 hover:bg-pink-600 text-white text-sm font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all inline-flex items-center gap-2"
-          >
-            <Plus className="size-5" />
-            Create Your First Class
-          </button>
-        </motion.div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {classes.map((cls, index) => (
+        {/* Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
+          {[
+            {
+              label: "My Classes",
+              value: classes.length,
+              icon: BookOpen,
+              color: "pink",
+              gradient: "from-pink-500 to-pink-600",
+              delay: 0,
+            },
+            {
+              label: "Total Students",
+              value: totalStudents,
+              icon: Users,
+              color: "blue",
+              gradient: "from-blue-500 to-blue-600",
+              delay: 0.1,
+            },
+            {
+              label: "This Week",
+              value: 0,
+              icon: Calendar,
+              color: "purple",
+              gradient: "from-purple-500 to-purple-600",
+              delay: 0.2,
+            },
+            {
+              label: "Assignments",
+              value: 0,
+              icon: FileText,
+              color: "green",
+              gradient: "from-green-500 to-green-600",
+              delay: 0.3,
+            },
+          ].map((stat) => (
             <motion.div
-              key={cls.id}
+              key={stat.label}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              onClick={() => router.push(`/teacher/classes/${cls.id}`)}
-              className="bg-white border border-gray-200/50 rounded-2xl shadow-lg hover:shadow-xl transition-all cursor-pointer overflow-hidden group"
+              transition={{ duration: 0.5, delay: stat.delay }}
+              className="group relative bg-white border-2 border-gray-100 rounded-2xl p-6 shadow-md hover:shadow-xl transition-all cursor-pointer overflow-hidden"
             >
               <div
-                className="h-24 p-6 text-white relative overflow-hidden"
-                style={{ backgroundColor: cls.color }}
-              >
-                <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors" />
-                <div className="relative z-10">
-                  <h3 className="text-xl font-bold mb-1">{cls.name}</h3>
-                  <p className="text-white/90 text-sm">{cls.subject}</p>
+                className={`absolute inset-0 bg-gradient-to-br ${stat.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-300`}
+              />
+              <div className="relative flex items-center gap-4">
+                <div
+                  className={`size-14 rounded-xl bg-gradient-to-br ${stat.gradient} flex items-center justify-center shadow-lg`}
+                >
+                  <stat.icon className="size-7 text-white" />
                 </div>
-              </div>
-              <div className="p-6">
-                {cls.section && (
-                  <p className="text-sm text-gray-600 mb-2">
-                    Section {cls.section}
-                    {cls.room && ` • Room ${cls.room}`}
+                <div>
+                  <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-1">
+                    {stat.label}
                   </p>
-                )}
-                <div className="flex items-center gap-2 text-gray-600">
-                  <Users className="size-4" />
-                  <span className="text-sm">
-                    {cls.studentIds.length}{" "}
-                    {cls.studentIds.length === 1 ? "student" : "students"}
-                  </span>
+                  <p className="text-3xl font-black text-gray-900">
+                    {stat.value}
+                  </p>
                 </div>
               </div>
             </motion.div>
           ))}
         </div>
-      )}
+
+        {/* Classes Grid */}
+        {classes.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="bg-white border-2 border-gray-100 rounded-2xl p-16 text-center shadow-lg"
+          >
+            <div className="relative inline-block mb-6">
+              <BookOpen className="size-20 text-gray-300" />
+              <Sparkles className="size-8 text-pink-500 absolute -top-2 -right-2 animate-pulse" />
+            </div>
+            <h3 className="text-2xl font-black text-gray-900 mb-3">
+              No classes yet
+            </h3>
+            <p className="text-gray-600 font-medium mb-8 max-w-md mx-auto">
+              Create your first class to get started with managing students and
+              assignments
+            </p>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowCreateModal(true)}
+              className="px-6 py-3.5 bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-pink-500/30 hover:shadow-xl hover:shadow-pink-500/40 transition-all inline-flex items-center gap-2.5"
+            >
+              <Plus className="size-5" />
+              Create Your First Class
+            </motion.button>
+          </motion.div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {classes.map((cls, index) => (
+              <motion.div
+                key={cls.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.4 + index * 0.1 }}
+                whileHover={{ y: -8, scale: 1.02 }}
+                onClick={() => router.push(`/teacher/classes/${cls.id}`)}
+                className="group bg-white border-2 border-gray-100 rounded-2xl shadow-md hover:shadow-2xl transition-all cursor-pointer overflow-hidden"
+              >
+                <div
+                  className="h-32 p-6 text-white relative overflow-hidden"
+                  style={{ backgroundColor: cls.color }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-black/0 via-black/0 to-black/20" />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
+                  <div className="relative z-10 h-full flex flex-col justify-between">
+                    <div>
+                      <h3 className="text-2xl font-black mb-1 line-clamp-1">
+                        {cls.name}
+                      </h3>
+                      <p className="text-white/90 font-semibold text-sm">
+                        {cls.subject}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-6">
+                  {cls.section && (
+                    <p className="text-sm font-semibold text-gray-600 mb-3">
+                      Section {cls.section}
+                      {cls.room && ` • Room ${cls.room}`}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-2 text-gray-700">
+                    <div className="size-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                      <Users className="size-4 text-blue-600" />
+                    </div>
+                    <span className="text-sm font-bold">
+                      {cls.studentIds.length}{" "}
+                      {cls.studentIds.length === 1 ? "student" : "students"}
+                    </span>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Create Class Modal */}
       <AnimatePresence>
@@ -293,124 +332,105 @@ export default function TeacherDashboard() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setShowCreateModal(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4"
+            onClick={() => !creating && setShowCreateModal(false)}
           >
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ type: "spring", duration: 0.5 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+              className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden border-2 border-gray-100"
             >
-              <div className="p-6 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white z-10">
-                <h2 className="text-2xl font-bold text-gray-900">
+              <div className="p-6 border-b-2 border-gray-100 flex items-center justify-between bg-gradient-to-r from-pink-50 to-purple-50">
+                <h2 className="text-2xl font-black text-gray-900">
                   Create New Class
                 </h2>
                 <button
-                  onClick={() => setShowCreateModal(false)}
-                  className="size-8 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-colors"
+                  onClick={() => !creating && setShowCreateModal(false)}
+                  disabled={creating}
+                  className="size-10 rounded-xl hover:bg-white/80 flex items-center justify-center transition-colors disabled:opacity-50"
                 >
-                  <X className="size-5 text-gray-500" />
+                  <X className="size-5 text-gray-600" />
                 </button>
               </div>
 
-              <form onSubmit={handleCreateClass} className="p-6 space-y-6">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Class Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 transition-all"
-                    placeholder="e.g., AP Biology"
-                  />
-                </div>
+              <form onSubmit={handleCreateClass} className="p-6 space-y-5 overflow-y-auto max-h-[calc(90vh-140px)]">
+                <TextField
+                  label="Class Name"
+                  required
+                  value={formData.name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
+                  placeholder="e.g., AP Biology"
+                  disabled={creating}
+                />
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Subject *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.subject}
-                      onChange={(e) =>
-                        setFormData({ ...formData, subject: e.target.value })
-                      }
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 transition-all"
-                      placeholder="e.g., Biology"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Section
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.section}
-                      onChange={(e) =>
-                        setFormData({ ...formData, section: e.target.value })
-                      }
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 transition-all"
-                      placeholder="e.g., A"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Room
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.room}
+                  <TextField
+                    label="Subject"
+                    required
+                    value={formData.subject}
                     onChange={(e) =>
-                      setFormData({ ...formData, room: e.target.value })
+                      setFormData({ ...formData, subject: e.target.value })
                     }
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 transition-all"
-                    placeholder="e.g., 204"
+                    placeholder="e.g., Biology"
+                    disabled={creating}
+                  />
+                  <TextField
+                    label="Section"
+                    value={formData.section}
+                    onChange={(e) =>
+                      setFormData({ ...formData, section: e.target.value })
+                    }
+                    placeholder="e.g., A"
+                    disabled={creating}
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Description
-                  </label>
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) =>
-                      setFormData({ ...formData, description: e.target.value })
-                    }
-                    rows={3}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 transition-all resize-none"
-                    placeholder="Brief description of the class..."
-                  />
-                </div>
+                <TextField
+                  label="Room"
+                  value={formData.room}
+                  onChange={(e) =>
+                    setFormData({ ...formData, room: e.target.value })
+                  }
+                  placeholder="e.g., 204"
+                  disabled={creating}
+                />
+
+                <TextArea
+                  label="Description"
+                  value={formData.description}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
+                  rows={3}
+                  placeholder="Brief description of the class..."
+                  disabled={creating}
+                />
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-3">
                     Class Color
                   </label>
                   <div className="flex gap-3">
                     {CLASS_COLORS.map((color) => (
-                      <button
+                      <motion.button
                         key={color.value}
                         type="button"
                         onClick={() =>
+                          !creating &&
                           setFormData({ ...formData, color: color.value })
                         }
-                        className={`size-10 rounded-lg transition-all ${
+                        disabled={creating}
+                        whileHover={{ scale: 1.15 }}
+                        whileTap={{ scale: 0.95 }}
+                        className={`size-12 rounded-xl transition-all shadow-md hover:shadow-lg disabled:opacity-50 ${
                           formData.color === color.value
-                            ? "ring-2 ring-offset-2 ring-gray-900 scale-110"
-                            : "hover:scale-110"
+                            ? "ring-4 ring-gray-900 ring-offset-2 scale-110"
+                            : ""
                         }`}
                         style={{ backgroundColor: color.value }}
                         title={color.name}
@@ -423,15 +443,32 @@ export default function TeacherDashboard() {
                   <button
                     type="button"
                     onClick={() => setShowCreateModal(false)}
-                    className="flex-1 px-4 py-3 border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-all"
+                    disabled={creating}
+                    className="flex-1 px-4 py-3.5 border-2 border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all disabled:opacity-50"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 px-4 py-3 bg-pink-500 hover:bg-pink-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all"
+                    disabled={creating}
+                    className="flex-1 px-4 py-3.5 bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white font-bold rounded-xl shadow-lg shadow-pink-500/30 hover:shadow-xl hover:shadow-pink-500/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    Create Class
+                    {creating ? (
+                      <>
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{
+                            duration: 1,
+                            repeat: Infinity,
+                            ease: "linear",
+                          }}
+                          className="size-5 border-2 border-white border-t-transparent rounded-full"
+                        />
+                        Creating...
+                      </>
+                    ) : (
+                      "Create Class"
+                    )}
                   </button>
                 </div>
               </form>
