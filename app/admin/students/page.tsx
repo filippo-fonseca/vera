@@ -5,9 +5,10 @@ import { useEffect, useState } from 'react';
 import { collection, query, where, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Student, PendingInvite } from '@/lib/types';
-import { motion, AnimatePresence } from 'framer-motion';
-import { UserPlus, Trash2, Mail, GraduationCap as GraduationCapIcon, Clock } from 'lucide-react';
-import Modal from '@/components/common/Modal/Modal';
+import { motion } from 'framer-motion';
+import { UserPlus } from 'lucide-react';
+import { StudentTable } from './components/StudentTable';
+import { AddStudentModal } from './components/AddStudentModal';
 
 export default function StudentsPage() {
   const { user } = useAuth();
@@ -194,275 +195,21 @@ export default function StudentsPage() {
         </motion.button>
       </motion.div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="bg-white/50 backdrop-blur-sm rounded-xl border border-gray-200/50 shadow-md overflow-hidden"
-      >
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200/50">
-            <thead className="bg-gradient-to-r from-gray-50 to-gray-100/50">
-              <tr>
-                {['Name', 'Email', 'Grade Level', 'Student ID', 'Actions'].map((header) => (
-                  <th
-                    key={header}
-                    className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider"
-                  >
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200/30">
-              <AnimatePresence>
-                {students.length === 0 && pendingInvites.length === 0 ? (
-                  <motion.tr
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                  >
-                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
-                      No students found. Invite your first student to get started.
-                    </td>
-                  </motion.tr>
-                ) : (
-                  <>
-                    {/* Pending Invites */}
-                    {pendingInvites.map((invite, index) => (
-                      <motion.tr
-                        key={`invite-${invite.id}`}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                        className="hover:bg-gradient-to-r hover:from-yellow-50/30 hover:to-orange-50/30 transition-all bg-yellow-50/20"
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-3">
-                            <div className="size-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-bold text-sm shadow-md">
-                              {invite.firstName?.[0]}{invite.lastName?.[0]}
-                            </div>
-                            <div>
-                              <div className="text-sm font-medium text-gray-900">
-                                {invite.firstName} {invite.lastName}
-                              </div>
-                              <div className="flex items-center gap-1.5 text-xs text-yellow-600">
-                                <Clock size={12} />
-                                Pending invitation
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <Mail size={14} className="text-gray-400" />
-                            {invite.email}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {invite.gradeLevel || '-'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {invite.studentId || '-'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => handleDeleteStudent(invite.id)}
-                            className="text-red-600 hover:text-red-800 flex items-center gap-1.5 transition-colors"
-                          >
-                            <Trash2 size={14} />
-                            Cancel
-                          </motion.button>
-                        </td>
-                      </motion.tr>
-                    ))}
+      <StudentTable
+        students={students}
+        pendingInvites={pendingInvites}
+        onDelete={handleDeleteStudent}
+      />
 
-                    {/* Active Students */}
-                    {students.map((student, index) => (
-                      <motion.tr
-                        key={student.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: (pendingInvites.length + index) * 0.05 }}
-                        className="hover:bg-gradient-to-r hover:from-pink-50/30 hover:to-purple-50/30 transition-all"
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-3">
-                            <div className="size-10 rounded-full bg-pink-500 flex items-center justify-center text-white font-bold text-sm shadow-md">
-                              {student.firstName?.[0]}{student.lastName?.[0]}
-                            </div>
-                            <div className="text-sm font-medium text-gray-900">
-                              {student.firstName} {student.lastName}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <Mail size={14} className="text-gray-400" />
-                            {student.email}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {student.gradeLevel || '-'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {student.studentId || '-'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => handleDeleteStudent(student.id)}
-                            className="text-red-600 hover:text-red-800 flex items-center gap-1.5 transition-colors"
-                          >
-                            <Trash2 size={14} />
-                            Delete
-                          </motion.button>
-                        </td>
-                      </motion.tr>
-                    ))}
-                  </>
-                )}
-              </AnimatePresence>
-            </tbody>
-          </table>
-        </div>
-      </motion.div>
-
-      <Modal
+      <AddStudentModal
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
-        title="Invite Student"
-      >
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200"
-          >
-            <p className="text-sm text-red-600">{error}</p>
-          </motion.div>
-        )}
-
-        <form onSubmit={handleAddStudent} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                First Name
-              </label>
-              <input
-                type="text"
-                value={formData.firstName}
-                onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                required
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-200/50 bg-white/50 backdrop-blur-sm text-gray-900 focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 transition-all"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Last Name
-              </label>
-              <input
-                type="text"
-                value={formData.lastName}
-                onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                required
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-200/50 bg-white/50 backdrop-blur-sm text-gray-900 focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 transition-all"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Email
-            </label>
-            <input
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              required
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-200/50 bg-white/50 backdrop-blur-sm text-gray-900 focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 transition-all"
-              placeholder="student@email.com"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Grade Level (optional)
-              </label>
-              <input
-                type="text"
-                value={formData.gradeLevel}
-                onChange={(e) => setFormData({ ...formData, gradeLevel: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-200/50 bg-white/50 backdrop-blur-sm text-gray-900 focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 transition-all"
-                placeholder="9th Grade"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Student ID (optional)
-              </label>
-              <input
-                type="text"
-                value={formData.studentId}
-                onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-200/50 bg-white/50 backdrop-blur-sm text-gray-900 focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 transition-all"
-                placeholder="S12345"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Guardian Email (optional)
-            </label>
-            <input
-              type="email"
-              value={formData.guardianEmail}
-              onChange={(e) => setFormData({ ...formData, guardianEmail: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-200/50 bg-white/50 backdrop-blur-sm text-gray-900 focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 transition-all"
-              placeholder="parent@email.com"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Guardian Phone (optional)
-            </label>
-            <input
-              type="tel"
-              value={formData.guardianPhone}
-              onChange={(e) => setFormData({ ...formData, guardianPhone: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-200/50 bg-white/50 backdrop-blur-sm text-gray-900 focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 transition-all"
-              placeholder="(555) 123-4567"
-            />
-          </div>
-
-          <div className="flex gap-3 mt-6">
-            <motion.button
-              type="button"
-              onClick={() => setShowAddModal(false)}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="flex-1 px-4 py-2.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              Cancel
-            </motion.button>
-            <motion.button
-              type="submit"
-              disabled={saving}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="flex-1 px-4 py-2.5 rounded-lg bg-pink-500 hover:bg-pink-600 text-white font-medium shadow-md hover:shadow-lg transition-all disabled:opacity-50"
-            >
-              {saving ? 'Sending Invite...' : 'Send Invite'}
-            </motion.button>
-          </div>
-        </form>
-      </Modal>
+        formData={formData}
+        onFormDataChange={setFormData}
+        onSubmit={handleAddStudent}
+        saving={saving}
+        error={error}
+      />
     </div>
   );
 }

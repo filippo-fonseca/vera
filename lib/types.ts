@@ -92,6 +92,21 @@ export interface Assignment {
   updatedAt: Date;
 }
 
+export interface AssignmentSubmission {
+  id: string;
+  assignmentId: string;
+  classId: string;
+  studentId: string;
+  studentName: string;
+  attachments: FileAttachment[];
+  submittedAt: Date;
+  status: 'submitted' | 'late' | 'graded';
+  grade?: number;
+  feedback?: string;
+  gradedBy?: string;
+  gradedAt?: Date;
+}
+
 export interface Post {
   id: string;
   classId: string;
