@@ -20,6 +20,8 @@ export interface User {
   schoolId: string;
   firstName: string;
   lastName: string;
+  photoURL?: string;
+  description?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -84,7 +86,7 @@ export interface Assignment {
   dueDate?: Date;
   points?: number;
   type: 'assignment' | 'quiz' | 'exam' | 'project';
-  attachments?: string[];
+  attachments?: FileAttachment[];
   createdBy: string;
   createdAt: Date;
   updatedAt: Date;
@@ -96,9 +98,46 @@ export interface Post {
   content: string;
   authorId: string;
   authorName: string;
+  authorPhotoURL?: string;
   type: 'announcement' | 'material' | 'assignment';
-  attachments?: string[];
+  attachments?: FileAttachment[];
   assignmentId?: string; // Reference to assignment if type is 'assignment'
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface FileAttachment {
+  id: string;
+  name: string;
+  url: string;
+  size: number; // in bytes
+  type: string; // MIME type
+  uploadedBy: string;
+  uploadedAt: Date;
+}
+
+export interface ClassFile {
+  id: string;
+  classId: string;
+  name: string;
+  url: string;
+  size: number; // in bytes
+  type: string; // MIME type
+  folderId?: string; // null/undefined means root directory
+  uploadedBy: string;
+  uploadedByName: string;
+  uploadedAt: Date;
+  // Optional references to where this file is used
+  assignmentId?: string;
+  postId?: string;
+}
+
+export interface ClassFolder {
+  id: string;
+  classId: string;
+  name: string;
+  parentId?: string; // null/undefined means root level
+  createdBy: string;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -19,6 +19,7 @@ interface AuthContextType {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,6 +29,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const fetchUserData = async (fbUser: FirebaseUser) => {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', fbUser.uid));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        setUser({
+          id: fbUser.uid,
+          email: fbUser.email!,
+          role: userData.role,
+          schoolId: userData.schoolId,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          photoURL: userData.photoURL,
+          description: userData.description,
+          createdAt: userData.createdAt?.toDate(),
+          updatedAt: userData.updatedAt?.toDate(),
+        });
+      } else {
+        console.error('User document not found in Firestore for:', fbUser.email);
+        setUser(null);
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      setUser(null);
+    }
+  };
+
   useEffect(() => {
     setPersistence(auth, browserLocalPersistence);
 
@@ -35,28 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setFirebaseUser(firebaseUser);
 
       if (firebaseUser) {
-        try {
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            setUser({
-              id: firebaseUser.uid,
-              email: firebaseUser.email!,
-              role: userData.role,
-              schoolId: userData.schoolId,
-              firstName: userData.firstName,
-              lastName: userData.lastName,
-              createdAt: userData.createdAt?.toDate(),
-              updatedAt: userData.updatedAt?.toDate(),
-            });
-          } else {
-            console.error('User document not found in Firestore for:', firebaseUser.email);
-            setUser(null);
-          }
-        } catch (error) {
-          console.error('Error fetching user data:', error);
-          setUser(null);
-        }
+        await fetchUserData(firebaseUser);
       } else {
         setUser(null);
       }
@@ -85,8 +92,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const refreshUser = async () => {
+    if (firebaseUser) {
+      await fetchUserData(firebaseUser);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, firebaseUser, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, firebaseUser, loading, signIn, signOut, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

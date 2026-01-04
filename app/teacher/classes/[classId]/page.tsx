@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, useParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -30,6 +30,11 @@ import {
   Heart,
   Star,
   Check,
+  MoreVertical,
+  FolderOpen,
+  Upload,
+  FolderPlus,
+  ChevronRight,
 } from "lucide-react";
 import {
   collection,
@@ -45,12 +50,15 @@ import {
   arrayRemove,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Class, Assignment, Student, Post } from "@/lib/types";
+import { Class, Assignment, Student, Post, FileAttachment } from "@/lib/types";
 import { TextField, Select, DatePicker, TextArea } from "@/components/common/Form";
 import StreamPost from "@/components/classroom/StreamPost";
 import { CLASS_ICONS, CLASS_COLORS, CLASS_BANNERS, getClassColor, getClassBanner, getClassIconName } from "@/lib/classCustomization";
+import FileUpload from "@/components/files/FileUpload";
+import FileCard from "@/components/files/FileCard";
+import { uploadMultipleFiles } from "@/lib/storage";
 
-type TabType = "stream" | "students" | "assignments";
+type TabType = "stream" | "students" | "assignments" | "files";
 
 export default function ClassDetailPage() {
   const { user } = useAuth();
@@ -86,6 +94,28 @@ export default function ClassDetailPage() {
   const [deletingClass, setDeletingClass] = useState(false);
   const [editingClass, setEditingClass] = useState(false);
   const [editClassTab, setEditClassTab] = useState<"basic" | "appearance">("basic");
+  const [showClassMenu, setShowClassMenu] = useState(false);
+  const classMenuRef = useRef<HTMLDivElement>(null);
+
+  // File upload states
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [assignmentFiles, setAssignmentFiles] = useState<File[]>([]);
+  const [postFiles, setPostFiles] = useState<File[]>([]);
+
+  // Files tab states
+  const [classFiles, setClassFiles] = useState<any[]>([]);
+  const [classFolders, setClassFolders] = useState<any[]>([]);
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [fetchingFiles, setFetchingFiles] = useState(false);
+  const [showUploadFilesModal, setShowUploadFilesModal] = useState(false);
+  const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
+  const [directUploadFiles, setDirectUploadFiles] = useState<File[]>([]);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [draggedFileId, setDraggedFileId] = useState<string | null>(null);
+  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
+  const [showMoveFileModal, setShowMoveFileModal] = useState(false);
+  const [fileToMove, setFileToMove] = useState<any | null>(null);
 
   // Search
   const [searchQuery, setSearchQuery] = useState("");
@@ -126,6 +156,8 @@ export default function ClassDetailPage() {
       fetchClassData();
       fetchAssignments();
       fetchPosts();
+      fetchClassFiles();
+      fetchClassFolders();
     }
   }, [user, classId]);
 
@@ -134,6 +166,17 @@ export default function ClassDetailPage() {
       fetchStudents();
     }
   }, [classData]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (classMenuRef.current && !classMenuRef.current.contains(event.target as Node)) {
+        setShowClassMenu(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const fetchClassData = async () => {
     try {
@@ -228,6 +271,45 @@ export default function ClassDetailPage() {
     }
   };
 
+  const fetchClassFiles = async () => {
+    try {
+      const filesQuery = query(
+        collection(db, "classFiles"),
+        where("classId", "==", classId)
+      );
+      const snapshot = await getDocs(filesQuery);
+      const filesData = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        uploadedAt: doc.data().uploadedAt?.toDate(),
+      }));
+
+      setClassFiles(filesData.sort((a: any, b: any) => b.uploadedAt.getTime() - a.uploadedAt.getTime()));
+    } catch (error) {
+      console.error("Error fetching files:", error);
+    }
+  };
+
+  const fetchClassFolders = async () => {
+    try {
+      const foldersQuery = query(
+        collection(db, "classFolders"),
+        where("classId", "==", classId)
+      );
+      const snapshot = await getDocs(foldersQuery);
+      const foldersData = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate(),
+        updatedAt: doc.data().updatedAt?.toDate(),
+      }));
+
+      setClassFolders(foldersData.sort((a: any, b: any) => a.name.localeCompare(b.name)));
+    } catch (error) {
+      console.error("Error fetching folders:", error);
+    }
+  };
+
   const searchAvailableStudents = async () => {
     if (!user || !searchQuery.trim()) {
       setAvailableStudents([]);
@@ -308,7 +390,19 @@ export default function ClassDetailPage() {
     if (!user) return;
 
     setCreatingAssignment(true);
+    setUploadingFiles(true);
     try {
+      // Upload files first
+      let attachments: FileAttachment[] = [];
+      if (assignmentFiles.length > 0) {
+        attachments = await uploadMultipleFiles(
+          assignmentFiles,
+          classId,
+          user.id,
+          "assignments"
+        );
+      }
+
       const assignmentData: any = {
         classId,
         title: assignmentForm.title,
@@ -325,8 +419,26 @@ export default function ClassDetailPage() {
       if (assignmentForm.points) {
         assignmentData.points = parseInt(assignmentForm.points);
       }
+      if (attachments.length > 0) {
+        assignmentData.attachments = attachments;
+      }
 
       const assignmentRef = await addDoc(collection(db, "assignments"), assignmentData);
+
+      // Create ClassFile documents for each attachment
+      for (const attachment of attachments) {
+        await addDoc(collection(db, "classFiles"), {
+          classId,
+          name: attachment.name,
+          url: attachment.url,
+          size: attachment.size,
+          type: attachment.type,
+          uploadedBy: user.id,
+          uploadedByName: `${user.firstName} ${user.lastName}`,
+          uploadedAt: new Date(),
+          assignmentId: assignmentRef.id,
+        });
+      }
 
       // Auto-create a post for this assignment
       await addDoc(collection(db, "posts"), {
@@ -335,6 +447,7 @@ export default function ClassDetailPage() {
         type: "assignment",
         authorId: user.id,
         authorName: `${user.firstName} ${user.lastName}`,
+        authorPhotoURL: user.photoURL,
         assignmentId: assignmentRef.id,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -347,6 +460,7 @@ export default function ClassDetailPage() {
         points: "",
         type: "assignment",
       });
+      setAssignmentFiles([]);
       setShowCreateAssignmentModal(false);
       await fetchAssignments();
       await fetchPosts();
@@ -354,6 +468,7 @@ export default function ClassDetailPage() {
       console.error("Error creating assignment:", error);
     } finally {
       setCreatingAssignment(false);
+      setUploadingFiles(false);
     }
   };
 
@@ -434,24 +549,60 @@ export default function ClassDetailPage() {
     if (!user) return;
 
     setCreatingPost(true);
+    setUploadingFiles(true);
     try {
-      await addDoc(collection(db, "posts"), {
+      // Upload files first
+      let attachments: FileAttachment[] = [];
+      if (postFiles.length > 0) {
+        attachments = await uploadMultipleFiles(
+          postFiles,
+          classId,
+          user.id,
+          "posts"
+        );
+      }
+
+      const postData: any = {
         classId,
         content: postForm.content,
         type: postForm.type,
         authorId: user.id,
         authorName: `${user.firstName} ${user.lastName}`,
+        authorPhotoURL: user.photoURL,
         createdAt: new Date(),
         updatedAt: new Date(),
-      });
+      };
+
+      if (attachments.length > 0) {
+        postData.attachments = attachments;
+      }
+
+      const postRef = await addDoc(collection(db, "posts"), postData);
+
+      // Create ClassFile documents for each attachment
+      for (const attachment of attachments) {
+        await addDoc(collection(db, "classFiles"), {
+          classId,
+          name: attachment.name,
+          url: attachment.url,
+          size: attachment.size,
+          type: attachment.type,
+          uploadedBy: user.id,
+          uploadedByName: `${user.firstName} ${user.lastName}`,
+          uploadedAt: new Date(),
+          postId: postRef.id,
+        });
+      }
 
       setPostForm({ content: "", type: "announcement" });
+      setPostFiles([]);
       setShowCreatePostModal(false);
       await fetchPosts();
     } catch (error) {
       console.error("Error creating post:", error);
     } finally {
       setCreatingPost(false);
+      setUploadingFiles(false);
     }
   };
 
@@ -577,6 +728,136 @@ export default function ClassDetailPage() {
     }
   };
 
+  const handleDirectFileUpload = async () => {
+    if (!user || directUploadFiles.length === 0) return;
+
+    setUploadingFiles(true);
+    try {
+      const attachments = await uploadMultipleFiles(
+        directUploadFiles,
+        classId,
+        user.id,
+        currentFolderId ? `folders/${currentFolderId}` : "files"
+      );
+
+      // Create ClassFile documents
+      for (const attachment of attachments) {
+        await addDoc(collection(db, "classFiles"), {
+          classId,
+          name: attachment.name,
+          url: attachment.url,
+          size: attachment.size,
+          type: attachment.type,
+          uploadedBy: user.id,
+          uploadedByName: `${user.firstName} ${user.lastName}`,
+          uploadedAt: new Date(),
+          folderId: currentFolderId,
+        });
+      }
+
+      setDirectUploadFiles([]);
+      setShowUploadFilesModal(false);
+      await fetchClassFiles();
+    } catch (error) {
+      console.error("Error uploading files:", error);
+    } finally {
+      setUploadingFiles(false);
+    }
+  };
+
+  const handleCreateFolder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !newFolderName.trim()) return;
+
+    setCreatingFolder(true);
+    try {
+      await addDoc(collection(db, "classFolders"), {
+        classId,
+        name: newFolderName,
+        parentId: currentFolderId,
+        createdBy: user.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      setNewFolderName("");
+      setShowCreateFolderModal(false);
+      await fetchClassFolders();
+    } catch (error) {
+      console.error("Error creating folder:", error);
+    } finally {
+      setCreatingFolder(false);
+    }
+  };
+
+  const handleDeleteFile = async (fileId: string) => {
+    if (!confirm("Are you sure you want to delete this file?")) return;
+
+    try {
+      await deleteDoc(doc(db, "classFiles", fileId));
+      await fetchClassFiles();
+    } catch (error) {
+      console.error("Error deleting file:", error);
+    }
+  };
+
+  const handleDeleteFolder = async (folderId: string) => {
+    if (!confirm("Are you sure you want to delete this folder? All files inside will also be deleted.")) return;
+
+    try {
+      // Delete all files in the folder
+      const filesInFolder = classFiles.filter((f: any) => (f.folderId || null) === folderId);
+      for (const file of filesInFolder) {
+        await deleteDoc(doc(db, "classFiles", file.id));
+      }
+
+      // Delete the folder
+      await deleteDoc(doc(db, "classFolders", folderId));
+
+      await fetchClassFiles();
+      await fetchClassFolders();
+    } catch (error) {
+      console.error("Error deleting folder:", error);
+    }
+  };
+
+  const handleMoveFile = async (fileId: string, targetFolderId: string | null) => {
+    try {
+      await updateDoc(doc(db, "classFiles", fileId), {
+        folderId: targetFolderId,
+        updatedAt: new Date(),
+      });
+      await fetchClassFiles();
+      setShowMoveFileModal(false);
+      setFileToMove(null);
+    } catch (error) {
+      console.error("Error moving file:", error);
+    }
+  };
+
+  const handleFileDragStart = (fileId: string) => {
+    setDraggedFileId(fileId);
+  };
+
+  const handleFolderDragOver = (e: React.DragEvent, folderId: string | null) => {
+    e.preventDefault();
+    setDragOverFolderId(folderId);
+  };
+
+  const handleFolderDrop = async (e: React.DragEvent, targetFolderId: string | null) => {
+    e.preventDefault();
+    if (draggedFileId) {
+      await handleMoveFile(draggedFileId, targetFolderId);
+      setDraggedFileId(null);
+      setDragOverFolderId(null);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedFileId(null);
+    setDragOverFolderId(null);
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
@@ -600,20 +881,24 @@ export default function ClassDetailPage() {
 
   return (
     <div className="min-h-screen">
+      {/* Back Button - Above Banner */}
+      <div className="mx-3 mt-3 mb-2">
+        <motion.button
+          whileHover={{ x: -2 }}
+          onClick={() => router.push("/teacher")}
+          className="flex items-center gap-1.5 text-gray-600 hover:text-gray-900 transition-all text-xs font-semibold hover:bg-gray-100 px-2.5 py-1.5 rounded-lg"
+        >
+          <ArrowLeft className="size-3.5" />
+          Back to Classes
+        </motion.button>
+      </div>
+
       {/* Header */}
       <div
-        className={`relative p-8 text-white shadow-xl bg-gradient-to-r ${getClassBanner(classData.banner).gradient}`}
+        className={`relative p-8 text-white shadow-xl bg-gradient-to-r ${getClassBanner(classData.banner).gradient} mx-3 rounded-2xl overflow-hidden`}
       >
         <div className="absolute inset-0 bg-black/10" />
         <div className="max-w-7xl mx-auto relative z-10">
-          <motion.button
-            whileHover={{ x: -4 }}
-            onClick={() => router.push("/teacher")}
-            className="flex items-center gap-1.5 text-white/90 hover:text-white mb-6 transition-all text-sm font-medium bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg backdrop-blur-sm"
-          >
-            <ArrowLeft className="size-4" />
-            Back to Classes
-          </motion.button>
           <div className="flex items-start justify-between">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -662,31 +947,62 @@ export default function ClassDetailPage() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
-              className="flex items-center gap-2"
+              className="relative"
+              ref={classMenuRef}
             >
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
-                onClick={openEditClass}
-                className="size-9 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white rounded-lg border border-white/20 shadow-sm transition-all flex items-center justify-center"
-                title="Edit class"
+                onClick={() => setShowClassMenu(!showClassMenu)}
+                className="size-9 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white rounded-lg border border-white/20 shadow-sm transition-all flex items-center justify-center cursor-pointer"
               >
-                <Edit className="size-4" />
+                <MoreVertical className="size-4" />
               </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={handleDeleteClass}
-                disabled={deletingClass}
-                className="size-9 bg-white/10 hover:bg-red-500/30 backdrop-blur-md text-white rounded-lg border border-white/20 hover:border-red-300/40 shadow-sm transition-all flex items-center justify-center disabled:opacity-50"
-                title="Delete class"
-              >
-                {deletingClass ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Trash2 className="size-4" />
-                )}
-              </motion.button>
+
+              {showClassMenu && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border-2 border-gray-100 overflow-hidden z-50"
+                >
+                  <button
+                    onClick={() => {
+                      openEditClass();
+                      setShowClassMenu(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 transition-colors text-left cursor-pointer"
+                  >
+                    <Edit className="size-4 text-blue-600" />
+                    <span className="text-sm font-bold text-gray-700">
+                      Edit Class
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowClassMenu(false);
+                      handleDeleteClass();
+                    }}
+                    disabled={deletingClass}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-50 transition-colors text-left disabled:opacity-50 cursor-pointer"
+                  >
+                    {deletingClass ? (
+                      <>
+                        <Loader2 className="size-4 text-red-600 animate-spin" />
+                        <span className="text-sm font-bold text-red-600">
+                          Deleting...
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="size-4 text-red-600" />
+                        <span className="text-sm font-bold text-red-600">
+                          Delete Class
+                        </span>
+                      </>
+                    )}
+                  </button>
+                </motion.div>
+              )}
             </motion.div>
           </div>
         </div>
@@ -700,6 +1016,7 @@ export default function ClassDetailPage() {
               { id: "stream", label: "Stream", icon: Home },
               { id: "students", label: "Students", icon: Users, count: students.length },
               { id: "assignments", label: "Assignments", icon: FileText, count: assignments.length },
+              { id: "files", label: "Files", icon: FolderOpen, count: classFiles.length },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1025,6 +1342,179 @@ export default function ClassDetailPage() {
               )}
             </motion.div>
           )}
+
+          {activeTab === "files" && (
+            <motion.div
+              key="files"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="space-y-6"
+            >
+              {/* Header with breadcrumb and actions */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div
+                    onDragOver={(e) => handleFolderDragOver(e, null)}
+                    onDrop={(e) => handleFolderDrop(e, null)}
+                    className={`px-3 py-1.5 rounded-lg transition-all ${
+                      dragOverFolderId === null && draggedFileId
+                        ? "bg-blue-100 border-2 border-blue-400"
+                        : "hover:bg-gray-100"
+                    }`}
+                  >
+                    <h2 className="text-3xl font-black text-gray-900">Files</h2>
+                  </div>
+                  {currentFolderId && (
+                    <>
+                      <ChevronRight className="size-5 text-gray-400" />
+                      <span className="text-xl font-bold text-gray-600">
+                        {classFolders.find((f: any) => f.id === currentFolderId)?.name}
+                      </span>
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {currentFolderId && (
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setCurrentFolderId(null)}
+                      className="px-3.5 py-2 bg-white border-2 border-gray-200 hover:border-gray-300 text-gray-700 text-xs font-bold rounded-lg shadow-sm transition-all flex items-center gap-1.5"
+                    >
+                      <ArrowLeft className="size-3.5" />
+                      Back
+                    </motion.button>
+                  )}
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setShowCreateFolderModal(true)}
+                    className="px-3.5 py-2 bg-white border-2 border-blue-200 hover:border-blue-300 text-blue-700 text-xs font-bold rounded-lg shadow-sm transition-all flex items-center gap-1.5"
+                  >
+                    <FolderPlus className="size-3.5" />
+                    New Folder
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setShowUploadFilesModal(true)}
+                    className="px-3.5 py-2 bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white text-xs font-bold rounded-lg shadow-sm transition-all flex items-center gap-1.5"
+                  >
+                    <Upload className="size-3.5" />
+                    Upload Files
+                  </motion.button>
+                </div>
+              </div>
+
+              {/* Folders */}
+              {classFolders.filter((f: any) => (f.parentId || null) === currentFolderId).length > 0 && (
+                <div>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 mb-3">
+                    Folders
+                  </h3>
+                  <div className="grid grid-cols-4 gap-4">
+                    {classFolders
+                      .filter((f: any) => (f.parentId || null) === currentFolderId)
+                      .map((folder: any, index: number) => (
+                        <motion.div
+                          key={folder.id}
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ duration: 0.3, delay: index * 0.05 }}
+                          onClick={() => setCurrentFolderId(folder.id)}
+                          onDragOver={(e) => handleFolderDragOver(e, folder.id)}
+                          onDrop={(e) => handleFolderDrop(e, folder.id)}
+                          className={`bg-white border-2 rounded-2xl p-5 hover:shadow-xl transition-all group relative ${
+                            dragOverFolderId === folder.id
+                              ? "border-blue-400 bg-blue-50"
+                              : "border-gray-100 hover:border-blue-200"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="size-14 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg mb-3">
+                                <FolderOpen className="size-7 text-white" />
+                              </div>
+                              <p className="font-black text-gray-900 truncate">
+                                {folder.name}
+                              </p>
+                              <p className="text-xs text-gray-500 font-medium mt-1">
+                                {classFiles.filter((f: any) => (f.folderId || null) === folder.id).length} files
+                              </p>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteFolder(folder.id);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-50 rounded-lg transition-all"
+                            >
+                              <Trash2 className="size-4 text-red-500" />
+                            </button>
+                          </div>
+                        </motion.div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Files */}
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 mb-3">
+                  Files ({classFiles.filter((f: any) => (f.folderId || null) === currentFolderId).length})
+                </h3>
+                {classFiles.filter((f: any) => (f.folderId || null) === currentFolderId).length === 0 ? (
+                  <div className="bg-white border-2 border-gray-100 rounded-2xl p-12 text-center shadow-lg">
+                    <FolderOpen className="size-20 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-xl font-black text-gray-900 mb-2">
+                      No files yet
+                    </h3>
+                    <p className="text-gray-600 font-medium mb-6">
+                      Upload files to share with your class
+                    </p>
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setShowUploadFilesModal(true)}
+                      className="px-5 py-3 bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-pink-500/30 hover:shadow-xl hover:shadow-pink-500/40 transition-all inline-flex items-center gap-2"
+                    >
+                      <Upload className="size-4" />
+                      Upload Files
+                    </motion.button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3">
+                    {classFiles
+                      .filter((f: any) => (f.folderId || null) === currentFolderId)
+                      .map((file: any) => (
+                        <FileCard
+                          key={file.id}
+                          file={{
+                            id: file.id,
+                            name: file.name,
+                            url: file.url,
+                            size: file.size,
+                            type: file.type,
+                            uploadedBy: file.uploadedBy,
+                            uploadedAt: file.uploadedAt,
+                          }}
+                          mini
+                          draggable
+                          onDragStart={() => handleFileDragStart(file.id)}
+                          onMove={() => {
+                            setFileToMove(file);
+                            setShowMoveFileModal(true);
+                          }}
+                          onDelete={() => handleDeleteFile(file.id)}
+                        />
+                      ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
 
@@ -1228,6 +1718,18 @@ export default function ClassDetailPage() {
                     }
                     placeholder="100"
                     disabled={creatingAssignment}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-bold text-gray-700">
+                    Attachments
+                  </label>
+                  <FileUpload
+                    files={assignmentFiles}
+                    onFilesChange={setAssignmentFiles}
+                    disabled={creatingAssignment}
+                    multiple
                   />
                 </div>
 
@@ -1461,6 +1963,18 @@ export default function ClassDetailPage() {
                   disabled={creatingPost}
                 />
 
+                <div className="space-y-2">
+                  <label className="block text-sm font-bold text-gray-700">
+                    Attachments
+                  </label>
+                  <FileUpload
+                    files={postFiles}
+                    onFilesChange={setPostFiles}
+                    disabled={creatingPost}
+                    multiple
+                  />
+                </div>
+
                 <div className="flex gap-3 pt-4">
                   <button
                     type="button"
@@ -1670,6 +2184,24 @@ export default function ClassDetailPage() {
                     <p className="text-gray-500 font-medium">
                       No instructions provided
                     </p>
+                  </div>
+                )}
+
+                {/* Attachments */}
+                {selectedAssignment.attachments && selectedAssignment.attachments.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 mb-3">
+                      Attachments ({selectedAssignment.attachments.length})
+                    </h3>
+                    <div className="space-y-3">
+                      {selectedAssignment.attachments.map((file) => (
+                        <FileCard
+                          key={file.id}
+                          file={file}
+                          compact
+                        />
+                      ))}
+                    </div>
                   </div>
                 )}
 
@@ -2059,6 +2591,261 @@ export default function ClassDetailPage() {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Upload Files Modal */}
+      <AnimatePresence>
+        {showUploadFilesModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4"
+            onClick={() => !uploadingFiles && setShowUploadFilesModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ type: "spring", duration: 0.5 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden border-2 border-gray-100"
+            >
+              <div className="p-6 border-b-2 border-gray-100 flex items-center justify-between bg-gradient-to-r from-pink-50 to-purple-50">
+                <h2 className="text-2xl font-black text-gray-900">Upload Files</h2>
+                <button
+                  onClick={() => setShowUploadFilesModal(false)}
+                  disabled={uploadingFiles}
+                  className="size-10 rounded-xl hover:bg-white/80 flex items-center justify-center transition-colors disabled:opacity-50"
+                >
+                  <X className="size-5 text-gray-600" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <FileUpload
+                  files={directUploadFiles}
+                  onFilesChange={setDirectUploadFiles}
+                  disabled={uploadingFiles}
+                  multiple
+                />
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowUploadFilesModal(false)}
+                    disabled={uploadingFiles}
+                    className="flex-1 px-4 py-3.5 border-2 border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDirectFileUpload}
+                    disabled={uploadingFiles || directUploadFiles.length === 0}
+                    className="flex-1 px-4 py-3.5 bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white font-bold rounded-xl shadow-lg shadow-pink-500/30 hover:shadow-xl hover:shadow-pink-500/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {uploadingFiles ? (
+                      <>
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          className="size-5 border-2 border-white border-t-transparent rounded-full"
+                        />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="size-4" />
+                        Upload Files
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Create Folder Modal */}
+      <AnimatePresence>
+        {showCreateFolderModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4"
+            onClick={() => !creatingFolder && setShowCreateFolderModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ type: "spring", duration: 0.5 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full border-2 border-gray-100"
+            >
+              <div className="p-6 border-b-2 border-gray-100 flex items-center justify-between bg-gradient-to-r from-blue-50 to-purple-50">
+                <h2 className="text-2xl font-black text-gray-900">New Folder</h2>
+                <button
+                  onClick={() => setShowCreateFolderModal(false)}
+                  disabled={creatingFolder}
+                  className="size-10 rounded-xl hover:bg-white/80 flex items-center justify-center transition-colors disabled:opacity-50"
+                >
+                  <X className="size-5 text-gray-600" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateFolder} className="p-6 space-y-4">
+                <TextField
+                  label="Folder Name"
+                  required
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  placeholder="My Folder"
+                  disabled={creatingFolder}
+                />
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateFolderModal(false)}
+                    disabled={creatingFolder}
+                    className="flex-1 px-4 py-3.5 border-2 border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={creatingFolder}
+                    className="flex-1 px-4 py-3.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {creatingFolder ? (
+                      <>
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          className="size-5 border-2 border-white border-t-transparent rounded-full"
+                        />
+                        Creating...
+                      </>
+                    ) : (
+                      <>
+                        <FolderPlus className="size-4" />
+                        Create Folder
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Move File Modal */}
+      <AnimatePresence>
+        {showMoveFileModal && fileToMove && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4"
+            onClick={() => setShowMoveFileModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ type: "spring", duration: 0.5 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full border-2 border-gray-100 max-h-[70vh] flex flex-col"
+            >
+              <div className="p-6 border-b-2 border-gray-100 flex items-center justify-between bg-gradient-to-r from-blue-50 to-purple-50">
+                <div>
+                  <h2 className="text-2xl font-black text-gray-900">Move File</h2>
+                  <p className="text-sm font-medium text-gray-600 mt-1 truncate">
+                    {fileToMove.name}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowMoveFileModal(false)}
+                  className="size-10 rounded-xl hover:bg-white/80 flex items-center justify-center transition-colors"
+                >
+                  <X className="size-5 text-gray-600" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-3 overflow-y-auto flex-1">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 mb-3">
+                  Select Destination
+                </h3>
+
+                {/* Root folder option */}
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleMoveFile(fileToMove.id, null)}
+                  className={`w-full flex items-center gap-3 p-4 border-2 rounded-xl transition-all ${
+                    (fileToMove.folderId || null) === null
+                      ? "border-pink-300 bg-pink-50"
+                      : "border-gray-200 hover:border-blue-300 hover:bg-blue-50"
+                  }`}
+                >
+                  <div className="size-10 rounded-lg bg-gradient-to-br from-gray-500 to-gray-600 flex items-center justify-center">
+                    <FolderOpen className="size-5 text-white" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="font-bold text-gray-900">Root Directory</p>
+                    <p className="text-xs text-gray-500">
+                      {classFiles.filter((f: any) => (f.folderId || null) === null).length} files
+                    </p>
+                  </div>
+                  {(fileToMove.folderId || null) === null && (
+                    <Check className="size-5 text-pink-600" />
+                  )}
+                </motion.button>
+
+                {/* Folder options */}
+                {classFolders.map((folder: any) => (
+                  <motion.button
+                    key={folder.id}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handleMoveFile(fileToMove.id, folder.id)}
+                    className={`w-full flex items-center gap-3 p-4 border-2 rounded-xl transition-all ${
+                      fileToMove.folderId === folder.id
+                        ? "border-pink-300 bg-pink-50"
+                        : "border-gray-200 hover:border-blue-300 hover:bg-blue-50"
+                    }`}
+                  >
+                    <div className="size-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                      <FolderOpen className="size-5 text-white" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="font-bold text-gray-900">{folder.name}</p>
+                      <p className="text-xs text-gray-500">
+                        {classFiles.filter((f: any) => (f.folderId || null) === folder.id).length} files
+                      </p>
+                    </div>
+                    {fileToMove.folderId === folder.id && (
+                      <Check className="size-5 text-pink-600" />
+                    )}
+                  </motion.button>
+                ))}
+
+                {classFolders.length === 0 && (
+                  <div className="text-center py-8">
+                    <FolderOpen className="size-12 text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500 font-medium">
+                      No folders yet. Create one to organize your files!
+                    </p>
+                  </div>
+                )}
+              </div>
             </motion.div>
           </motion.div>
         )}

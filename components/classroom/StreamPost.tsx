@@ -12,6 +12,9 @@ import {
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Post, Assignment } from "@/lib/types";
+import FileCard from "@/components/files/FileCard";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 interface StreamPostProps {
   post: Post;
@@ -31,6 +34,7 @@ export default function StreamPost({
   canEdit = false,
 }: StreamPostProps) {
   const [showMenu, setShowMenu] = useState(false);
+  const [authorPhotoURL, setAuthorPhotoURL] = useState<string | undefined>(post.authorPhotoURL);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -44,15 +48,36 @@ export default function StreamPost({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Fetch author's photo if not present in post
+  useEffect(() => {
+    const fetchAuthorPhoto = async () => {
+      if (!post.authorPhotoURL && post.authorId) {
+        try {
+          const userDoc = await getDoc(doc(db, "users", post.authorId));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            if (userData.photoURL) {
+              setAuthorPhotoURL(userData.photoURL);
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching author photo:", error);
+        }
+      }
+    };
+
+    fetchAuthorPhoto();
+  }, [post.authorId, post.authorPhotoURL]);
+
   const getPostIcon = () => {
     switch (post.type) {
       case "assignment":
-        return <FileText className="size-5 text-purple-600" />;
+        return <FileText className="size-4 text-white" />;
       case "material":
-        return <BookOpen className="size-5 text-blue-600" />;
+        return <BookOpen className="size-4 text-white" />;
       case "announcement":
       default:
-        return <Megaphone className="size-5 text-pink-600" />;
+        return <Megaphone className="size-4 text-white" />;
     }
   };
 
@@ -105,6 +130,14 @@ export default function StreamPost({
     }
   };
 
+  const getAuthorInitials = () => {
+    const names = post.authorName.split(" ");
+    if (names.length >= 2) {
+      return `${names[0][0]}${names[1][0]}`.toUpperCase();
+    }
+    return post.authorName.substring(0, 2).toUpperCase();
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -119,11 +152,29 @@ export default function StreamPost({
         {/* Author Header */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div
-              className={`size-12 rounded-xl bg-gradient-to-br ${getPostTypeColor()} flex items-center justify-center shadow-lg`}
-            >
-              {getPostIcon()}
+            {/* Author Profile Picture */}
+            <div className="relative">
+              {authorPhotoURL ? (
+                <img
+                  src={authorPhotoURL}
+                  alt={post.authorName}
+                  className="size-12 rounded-full object-cover border-2 border-gray-200 shadow-md"
+                />
+              ) : (
+                <div className="size-12 rounded-full bg-gradient-to-br from-gray-400 to-gray-500 flex items-center justify-center border-2 border-gray-200 shadow-md">
+                  <span className="text-white font-black text-sm">
+                    {getAuthorInitials()}
+                  </span>
+                </div>
+              )}
+              {/* Post Type Badge - overlaid on profile pic */}
+              <div
+                className={`absolute -bottom-1 -right-1 size-6 rounded-full bg-gradient-to-br ${getPostTypeColor()} flex items-center justify-center shadow-lg border-2 border-white`}
+              >
+                {getPostIcon()}
+              </div>
             </div>
+
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <h4 className="font-black text-gray-900">{post.authorName}</h4>
@@ -235,15 +286,20 @@ export default function StreamPost({
 
           {/* Attachments */}
           {post.attachments && post.attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {post.attachments.map((attachment, index) => (
-                <div
-                  key={index}
-                  className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-bold text-gray-700 cursor-pointer transition-colors"
-                >
-                  {attachment}
-                </div>
-              ))}
+            <div className="space-y-2">
+              <h4 className="text-sm font-bold text-gray-600 uppercase tracking-wide">
+                Attachments ({post.attachments.length})
+              </h4>
+              <div className="space-y-2">
+                {post.attachments.map((file) => (
+                  <FileCard
+                    key={file.id}
+                    file={file}
+                    compact
+                    showActions={false}
+                  />
+                ))}
+              </div>
             </div>
           )}
         </div>

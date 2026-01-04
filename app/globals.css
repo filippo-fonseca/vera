@@ -75,3 +75,15 @@ body {
   margin: 0;
   padding: 0;
 }
+
+/* Cursor pointer for clickable elements */
+button,
+a,
+[role="button"],
+[onclick],
+label[for],
+input[type="checkbox"],
+input[type="radio"],
+select {
+  cursor: pointer;
+}
